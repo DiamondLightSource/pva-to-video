@@ -14,6 +14,7 @@ env:
   # https://github.com/pytest-dev/pytest/issues/2042
   PY_IGNORE_IMPORTMISMATCH: "1"
   UV_PYTHON: ${{ inputs.python-version }}
+  EXAMPLE_SERVICES_PATH: ./example-services
 
 jobs:
   run:
@@ -23,6 +24,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
+          submodules: recursive
           # Need this to get version number from last tag
           fetch-depth: 0
 

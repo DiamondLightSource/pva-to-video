@@ -90,3 +90,27 @@ docker run --rm -p 8080:8080 \
 | `--host` | `0.0.0.0` | Bind address |
 | `--port` | `8080` | Bind port |
 | `--log-level` | `info` | `debug`, `info`, `warning`, or `error` |
+
+## Trying it with example-services
+
+The [epics-containers/example-services](https://github.com/epics-containers/example-services)
+repository provides a simulated areaDetector camera (`bl01t-di-cam-01`) and
+a PVA gateway (`pvagw`) that bridges the camera stream to `127.0.0.1:9075`.
+
+Follow the [epics-containers workstation setup tutorial](https://epics-containers.github.io/main/tutorials/setup_workstation.html)
+to install Docker or Podman and clone `example-services`, then follow the [launch a simulation beamline tutorial](https://epics-containers.github.io/main/tutorials/launch_example.html) to start the simulation IOC.
+
+Once the services are running, start `pva-to-video`:
+
+```bash
+EPICS_PVA_NAME_SERVERS=127.0.0.1:9075 pva-to-video
+```
+
+Open <http://localhost:8080> in a browser, enter the PV name
+`BL01T-DI-CAM-01:PVA:OUTPUT`, and click **View** to see the live
+1024 × 1024 simulated detector image.  You can also point an `<img>` tag
+directly at the stream:
+
+```
+http://localhost:8080/mjpg/BL01T-DI-CAM-01:PVA:OUTPUT
+```
