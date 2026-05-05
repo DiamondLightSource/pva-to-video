@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: pva-to-video
+  title: pva-to-video
+  description: HTTP service that provides on demand video streams from NTNDArrays served over EPICS PVA
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/beamline-controls
