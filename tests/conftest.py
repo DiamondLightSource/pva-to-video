@@ -12,9 +12,9 @@ import pytest
 
 def fixture_is_used(fixture_name: str, session: pytest.Session) -> bool:
     for item in session.items:
-        for f in item.fixturenames:
-            if f == fixture_name:
-                return True
+        fixturenames: list[str] = getattr(item, "fixturenames", [])
+        if fixture_name in fixturenames:
+            return True
     return False
 
 

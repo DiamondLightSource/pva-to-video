@@ -16,6 +16,7 @@ import io
 import os
 import subprocess
 import time
+from collections.abc import Generator
 from pathlib import Path
 
 import httpx
@@ -85,7 +86,7 @@ def ioc(pvagw, docker_composer):  # type: ignore[return]
 
 
 @pytest.fixture(scope="module")
-def base_url(ioc: None) -> str:  # type: ignore[return]
+def base_url(ioc: None) -> Generator[str, None, None]:
     """Start pva-to-video on port 18080 and yield its base URL.
 
     Skips the entire module when ``EXAMPLE_SERVICES_PATH`` is not set.
