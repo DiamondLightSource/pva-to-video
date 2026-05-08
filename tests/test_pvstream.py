@@ -56,6 +56,9 @@ def test_encode_with_client_connected() -> None:
     assert stream.latest_frame is not None
     # The frame should be a valid MJPEG block starting with the boundary.
     assert stream.latest_frame.startswith(b"--frame\r\n")
+    # Raw JPEG bytes are also stored (for the WebSocket endpoint).
+    assert stream.latest_jpeg is not None
+    assert stream.latest_jpeg[:2] == b"\xff\xd8"  # JPEG SOI marker
 
 
 def test_cached_value_encoded_on_first_client() -> None:
@@ -72,3 +75,5 @@ def test_cached_value_encoded_on_first_client() -> None:
     stream.add_client()
     assert stream.latest_frame is not None
     assert stream.latest_frame.startswith(b"--frame\r\n")
+    assert stream.latest_jpeg is not None
+    assert stream.latest_jpeg[:2] == b"\xff\xd8"  # JPEG SOI marker

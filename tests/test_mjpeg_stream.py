@@ -12,6 +12,7 @@ To run manually inside the devcontainer::
 
 from __future__ import annotations
 
+import asyncio
 import io
 import os
 import subprocess
@@ -21,6 +22,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+import websockets
 from PIL import Image
 
 # PV served by the bl01t-di-cam-01 simulation IOC.
@@ -175,3 +177,32 @@ def test_viewer_page_loads(base_url: str) -> None:
         assert resp.status_code == 200
         assert "text/html" in resp.headers.get("content-type", "")
         assert "/mjpg/" in resp.text
+        assert "/ws/mjpg/" in resp.text
+
+
+def test_ws_stream_returns_valid_frames(base_url: str) -> None:
+    """Connect to the WebSocket endpoint, collect ≥3 raw JPEG frames, verify
+    image dimensions."""
+    ws_url = base_url.replace("http://", "ws://") + f"/ws/mjpg/{TEST_PV}"
+    target_frames = 3
+
+    async def _collect() -> list[bytes]:
+        frames: list[bytes] = []
+        async with websockets.connect(ws_url) as ws:
+            while len(frames) < target_frames:
+                msg = await asyncio.wait_for(ws.recv(), timeout=30.0)
+                assert isinstance(msg, bytes), "Expected binary WebSocket message"
+                frames.append(msg)
+        return frames
+
+    frames = asyncio.run(_collect())
+
+    assert len(frames) >= target_frames, (
+        f"Expected ≥{target_frames} frames, got {len(frames)}"
+    )
+    for i, jpeg_bytes in enumerate(frames[:target_frames]):
+        assert jpeg_bytes[:2] == b"\xff\xd8", f"Frame {i}: not a JPEG (missing SOI)"
+        img = Image.open(io.BytesIO(jpeg_bytes))
+        assert img.size == (1024, 1024), (
+            f"Frame {i}: expected 1024×1024, got {img.size}"
+        )

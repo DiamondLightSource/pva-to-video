@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import numpy as np
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from p4p.client.asyncio import Context
@@ -117,6 +117,7 @@ class PVStream:
     def __init__(self, pv_name: str, ctx: Context) -> None:
         self.pv_name = pv_name
         self.ctx = ctx
+        self.latest_jpeg: bytes | None = None
         self.latest_frame: bytes | None = None
         self.latest_raw: object = None
         self.frame_condition = asyncio.Condition()
@@ -151,9 +152,10 @@ class PVStream:
             self.frame_condition.notify_all()
 
     def encode(self, value: object) -> None:
-        """Encode *value* to JPEG and store as latest_frame."""
+        """Encode *value* to JPEG and store as latest_jpeg / latest_frame."""
         try:
             jpeg = _ndarray_to_jpeg(value)
+            self.latest_jpeg = jpeg
             self.latest_frame = _encode_mjpeg_frame(jpeg)
         except Exception:
             logger.warning("Failed to encode frame for %s", self.pv_name, exc_info=True)
@@ -247,6 +249,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 
@@ -262,27 +265,49 @@ _VIEWER_HTML = """\
   <title>PVA MJPEG Viewer</title>
   <style>
     body {{ font-family: sans-serif; margin: 2em; background: #1e1e1e; color: #ccc; }}
-    img  {{ border: 1px solid #555; max-width: 100%%; background: #000; }}
+    img, canvas {{ border: 1px solid #555; max-width: 100%%; background: #000;
+               display: block; margin-bottom: .5em; }}
     form {{ margin-bottom: 1em; }}
     input[type=text] {{ width: 24em; padding: .3em; }}
-    h1 {{ font-size: 1.4em; }}
+    h1 {{ font-size: 1.4em; }} h2 {{ font-size: 1.1em; margin-top: 1.5em; }}
   </style>
 </head>
 <body>
-  <h1>PVA &rarr; MJPEG Viewer</h1>
+  <h1>PVA &rarr; MJPEG / WebSocket Viewer</h1>
   <form id="pvform">
     <label>PV name:
       <input type="text" id="pvname" value="{default_pv}">
     </label>
     <button type="submit">View</button>
   </form>
+  <h2>MJPEG (HTTP)</h2>
   <img id="stream" src="/mjpg/{default_pv}" alt="MJPEG stream">
+  <h2>WebSocket (canvas)</h2>
+  <canvas id="wscanvas"></canvas>
   <script>
-    document.getElementById("pvform").addEventListener("submit", function(e) {{
+    var ctx = document.getElementById('wscanvas').getContext('2d');
+    var ws;
+    function connectWs(pv) {{
+      if (ws) ws.close();
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/ws/mjpg/' + pv);
+      ws.binaryType = 'blob';
+      ws.onmessage = async function(e) {{
+        var bmp = await createImageBitmap(e.data);
+        ctx.canvas.width = bmp.width;
+        ctx.canvas.height = bmp.height;
+        ctx.drawImage(bmp, 0, 0);
+      }};
+    }}
+    document.getElementById('pvform').addEventListener('submit', function(e) {{
       e.preventDefault();
-      var pv = document.getElementById("pvname").value.trim();
-      if (pv) document.getElementById("stream").src = "/mjpg/" + pv;
+      var pv = document.getElementById('pvname').value.trim();
+      if (pv) {{
+        document.getElementById('stream').src = '/mjpg/' + pv;
+        connectWs(pv);
+      }}
     }});
+    connectWs(document.getElementById('pvname').value.trim());
   </script>
 </body>
 </html>
@@ -367,3 +392,64 @@ async def mjpeg_stream(pv_name: str, request: Request) -> Response:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# WebSocket JPEG route
+# ---------------------------------------------------------------------------
+
+
+async def _ws_jpeg_generator(stream: PVStream) -> AsyncGenerator[bytes, None]:
+    min_interval = 1.0 / MAX_CLIENT_FPS
+    last_sent = 0.0
+
+    if stream.latest_jpeg is not None:
+        yield stream.latest_jpeg
+        last_sent = time.monotonic()
+
+    while True:
+        try:
+            async with asyncio.timeout(5.0):
+                async with stream.frame_condition:
+                    await stream.frame_condition.wait()
+        except TimeoutError:
+            continue
+
+        jpeg = stream.latest_jpeg
+        if jpeg is None:
+            continue
+
+        now = time.monotonic()
+        gap = now - last_sent
+        if gap < min_interval:
+            await asyncio.sleep(min_interval - gap)
+
+        yield jpeg
+        last_sent = time.monotonic()
+
+
+@app.websocket("/ws/mjpg/{pv_name:path}")
+async def ws_mjpeg_stream(websocket: WebSocket, pv_name: str) -> None:
+    if _pva_context is None:
+        await websocket.close(code=1013)  # Try again later
+        return
+
+    async with _streams_lock:
+        stream = _streams.get(pv_name)
+        if stream is None:
+            stream = PVStream(pv_name=pv_name, ctx=_pva_context)
+            stream.start()
+            _streams[pv_name] = stream
+        stream.add_client()
+
+    await websocket.accept()
+    try:
+        async for jpeg in _ws_jpeg_generator(stream):
+            try:
+                await websocket.send_bytes(jpeg)
+            except WebSocketDisconnect:
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        stream.remove_client()
