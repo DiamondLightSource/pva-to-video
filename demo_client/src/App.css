@@ -1,0 +1,20 @@
+.center {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+label {
+  grid-column: 2 / 6;
+  grid-row: 1;
+}
+
+.center>div {
+  grid-column: 1 / 7;
+  grid-row: 2 / 4;
+  height: 480px;
+}
+
+button {
+  grid-column: 4;
+}

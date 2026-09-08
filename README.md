@@ -114,3 +114,19 @@ directly at the stream:
 ```
 http://localhost:8080/mjpg/BL01T-DI-CAM-01:PVA:OUTPUT
 ```
+
+## With Davidia server/client
+
+Start the plot server with
+```bash
+pva-to-dvd --port 9000            # custom port
+```
+
+Clone this repo and with NodeJS and pnpm installed
+```
+cd demo_client
+pnpm install
+pnpm dev
+```
+then open your browser on http://localhost:5173
+

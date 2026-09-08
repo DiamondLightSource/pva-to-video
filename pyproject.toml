@@ -19,6 +19,7 @@ dependencies = [
     "p4p>=4.1",
     "numpy>=1.24",
     "Pillow>=10.0",
+    "davidia>=1.2.0",
 ]
 dynamic = ["version"]
 license.file = "LICENSE"
@@ -41,6 +42,10 @@ dev = [
 
 [project.scripts]
 pva-to-video = "pva_to_video.__main__:main"
+pva-to-dvd = "pva_to_video.dvd_app:main"
+
+[project.entry-points."davidia.plugins"]
+pvaplugin = "pva_to_video.dvd_plugin:PVASourcePlugin"
 
 [project.urls]
 GitHub = "https://github.com/DiamondLightSource/pva-to-video"
