@@ -1,5 +1,5 @@
 # Changes here will be overwritten by Copier
-_commit: 5.1.0
+_commit: 5.4.0
 _src_path: https://github.com/DiamondLightSource/python-copier-template.git
 author_email: tom.cobb@diamond.ac.uk
 author_name: Tom Cobb
@@ -10,7 +10,6 @@ description: HTTP service that provides on demand video streams from NTNDArrays 
     over EPICS PVA
 distribution_name: pva-to-video
 docker: true
-docker_debug: false
 docs_type: README
 git_platform: github.com
 github_org: DiamondLightSource
