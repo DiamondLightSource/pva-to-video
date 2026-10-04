@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 # The runtime stage copies the built venv into a runtime container
-FROM ubuntu:noble AS runtime
+FROM ubuntu:resolute AS runtime
 
 # Copy the python installation from the build stage
 COPY --from=build /python /python
