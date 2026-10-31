@@ -1,6 +1,6 @@
 # The devcontainer should use the developer target and run as root with podman
 # or docker with user namespaces.
-FROM ghcr.io/diamondlightsource/ubuntu-devcontainer:noble AS developer
+FROM ghcr.io/diamondlightsource/ubuntu-devcontainer:resolute AS developer
 
 ENV DOCKER=docker-28.5.1
 ENV DOCKER_COMPOSE_RELEASE_TAG=v2.40.3
@@ -38,9 +38,8 @@ ENV UV_PYTHON_INSTALL_DIR=/python
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-editable --no-dev --managed-python
 
-
 # The runtime stage copies the built venv into a runtime container
-FROM ubuntu:noble AS runtime
+FROM ubuntu:resolute AS runtime
 
 # Copy the python installation from the build stage
 COPY --from=build /python /python
